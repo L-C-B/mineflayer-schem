@@ -1,5 +1,5 @@
 const mineflayer = require('mineflayer');
-const { pathfinder } = require('mineflayer-pathfinder');
+const baritoneLoader = require('@miner-org/mineflayer-baritone').loader;
 const { Build, builder } = require('../index');
 const SchematicReader = require('../lib/SchematicReader');
 const fs = require('fs').promises;
@@ -11,7 +11,7 @@ const bot = mineflayer.createBot({
     username: process.argv[4] || 'FastBuilder',
 });
 
-bot.loadPlugin(pathfinder);
+bot.loadPlugin(baritoneLoader);
 
 const builderOptions = {
     buildSpeed: 5.0,

@@ -23,7 +23,7 @@ npm install mineflayer-schem
 
 ```javascript
 const mineflayer = require('mineflayer');
-const { pathfinder } = require('mineflayer-pathfinder');
+const baritoneLoader = require('@miner-org/mineflayer-baritone').loader;
 const { Build, builder } = require('mineflayer-schem');
 const { Schematic } = require('prismarine-schematic');
 const fs = require('fs').promises;
@@ -36,7 +36,7 @@ const bot = mineflayer.createBot({
   version: '1.20.4' // Change according to your server
 });
 
-bot.loadPlugin(pathfinder);
+bot.loadPlugin(baritoneLoader);
 bot.loadPlugin(builder);
 
 bot.once('spawn', async () => {
@@ -150,6 +150,12 @@ Pull requests and suggestions are welcome!
 MIT
 
 ## Recent Changes
+
+### 1.5.2
+- Version bump to fix npm publish error.
+
+### 1.5.1
+- README update and prep for npm publish.
 
 ### 1.5.0
 - Support for modern and legacy schematic formats
