@@ -1,4 +1,3 @@
-const { goals } = require('@miner-org/mineflayer-baritone');
 const Vec3 = require('vec3');
 const Build = require('./lib/build.js');
 const interactable = require('./lib/interactable.json');
@@ -68,8 +67,10 @@ function inject(bot, options = {}) {
         };
     const baritone = resolveBaritone(bot);
 
-    if (!baritone || typeof baritone.goto !== 'function') {
-        throw new Error('@miner-org/mineflayer-baritone must be loaded before mineflayer-schem');
+    if (!bot.pathfinder || typeof bot.pathfinder.goto !== 'function') {
+        if (!baritone || typeof baritone.goto !== 'function') {
+            throw new Error('mineflayer-schem requires a movement backend: mineflayer-pathfinder or @miner-org/mineflayer-baritone');
+        }
     }
 
     // Prevent Baritone from pathing via ladders: remove 'ladder' from climbable blocks when possible
@@ -78,6 +79,38 @@ function inject(bot, options = {}) {
             baritone.climbableBlocks = baritone.climbableBlocks.filter(b => String(b).toLowerCase() !== 'ladder');
         }
     } catch (e) {}
+
+    if (typeof bot.placeSlab !== 'function' && typeof bot._genericPlace === 'function') {
+        const { onceWithCleanup } = require('mineflayer/lib/promise_utils');
+
+        async function placeBlockWithOptions(referenceBlock, faceVector, options) {
+            const dest = referenceBlock.position.plus(faceVector);
+            let oldBlock = bot.blockAt(dest);
+            await bot._genericPlace(referenceBlock, faceVector, options);
+
+            let newBlock = bot.blockAt(dest);
+            if (oldBlock && newBlock && oldBlock.type === newBlock.type) {
+                [oldBlock, newBlock] = await onceWithCleanup(bot, `blockUpdate:${dest}`, {
+                    timeout: 5000,
+                    checkCondition: (oldBlock, newBlock) => !oldBlock || !newBlock || oldBlock.type !== newBlock.type
+                });
+            }
+
+            if (!oldBlock && !newBlock) return;
+            if (oldBlock && newBlock && oldBlock.type === newBlock.type) {
+                throw new Error(`No block has been placed : the block is still ${oldBlock?.name}`);
+            }
+        }
+
+        bot.placeSlab = async function(referenceBlock, faceVector, isTopSlab = false) {
+            const slabOptions = {
+                swingArm: 'right',
+                forceLook: true,
+                half: isTopSlab ? 'top' : 'bottom'
+            };
+            await placeBlockWithOptions(referenceBlock, faceVector, slabOptions);
+        };
+    }
 
     const mcData = require('minecraft-data')(bot.version);
     const Item = require('prismarine-item')(bot.version);
@@ -295,60 +328,12 @@ function inject(bot, options = {}) {
 
     async function performGotoNear(pos, range = 3, options = {}) {
         const targetPos = pos.floored ? pos.floored() : new Vec3(pos.x, pos.y, pos.z);
-        const useLegacyPrecisionPathing = !!(options && options.forcePrecisePathing);
         const forbidPathScaffolding = !!(options && options.forbidPathScaffolding);
-        const antiFreezeEnabled = !!(options && options.antiFreeze);
-        const antiFreezeTimeoutMs = options && typeof options.antiFreezeMs === 'number'
-            ? options.antiFreezeMs
-            : 10000;
         const allowBreakLastResort = !!(settings.preventPathBreaking && settings.allowBreakingAsLastResort);
-        const maxBusyRetries = 6;
         const restoreNoBreak = applyTemporaryNoBreakPathing({ allowPlacing: !forbidPathScaffolding });
         let lastError = null;
 
         try {
-            for (let attempt = 1; attempt <= maxBusyRetries; attempt++) {
-                if (baritone.stopped === false) {
-                    if (typeof baritone.stop === 'function') {
-                        baritone.stop();
-                        await wait(100);
-                    } else {
-                        const becameIdle = await waitForBaritoneIdle(1500, 50);
-                        if (!becameIdle) {
-                            await wait(100);
-                        }
-                    }
-                }
-
-                try {
-                    const result = antiFreezeEnabled
-                        ? await baritoneGotoWithAntiFreeze(targetPos, range, antiFreezeTimeoutMs)
-                        : await baritone.goto(new goals.GoalNear(targetPos, range));
-
-                    if (result && result.status === 'failed') {
-                        throw result.error || new Error('Baritone failed to reach the target');
-                    }
-
-                    return;
-                } catch (error) {
-                    lastError = error;
-                    if (error && error.code === 'BARITONE_STALLED') {
-                        await wait(150 + (attempt * 100));
-                        continue;
-                    }
-
-                    if (!isAlreadyGoingError(error)) {
-                        break;
-                    }
-
-                    if (typeof baritone.stop === 'function') {
-                        baritone.stop();
-                    }
-
-                    await wait(150 + (attempt * 100));
-                }
-            }
-
             if (bot.pathfinder && typeof bot.pathfinder.goto === 'function') {
                 const pfGoals = getPathfinderGoals();
 
@@ -357,48 +342,51 @@ function inject(bot, options = {}) {
                     let appliedNoDig = false;
 
                     try {
+                        if (baritone && typeof baritone.stop === 'function' && baritone.stopped === false) {
+                            baritone.stop();
+                            await wait(100);
+                        }
+
                         if (settings.preventPathBreaking) {
                             const pfModule = require('mineflayer-pathfinder');
                             if (pfModule && pfModule.Movements && typeof bot.pathfinder.setMovements === 'function') {
                                 previousMovements = bot.pathfinder.movements || null;
                                 const noDigMovements = new pfModule.Movements(bot);
                                 noDigMovements.canDig = false;
-                                // During cleanup, avoid creating new scaffold/towers while moving.
                                 noDigMovements.allow1by1towers = !forbidPathScaffolding;
                                 if (forbidPathScaffolding && Array.isArray(noDigMovements.scafoldingBlocks)) {
                                     noDigMovements.scafoldingBlocks = [];
                                 }
-                                // Avoid stepping on fences/walls and the block above them
-                                    try {
-                                        const fenceWallExclusion = (block) => {
-                                            try {
-                                                if (!block || !block.position) return 0;
-                                                const name = String(block.name || '').toLowerCase();
-                                                if (name.includes('fence') || name.includes('wall')) return 100;
-                                                const below = bot.blockAt(block.position.offset(0, -1, 0), false);
-                                                const belowName = below && below.name ? String(below.name).toLowerCase() : '';
-                                                if (belowName.includes('fence') || belowName.includes('wall')) return 100;
-                                                const below2 = bot.blockAt(block.position.offset(0, -2, 0), false);
-                                                const below2Name = below2 && below2.name ? String(below2.name).toLowerCase() : '';
-                                                if (below2Name.includes('fence') || below2Name.includes('wall')) return 100;
-                                            } catch (e) {}
-                                            return 0;
-                                        };
-                                        noDigMovements.exclusionAreasStep = noDigMovements.exclusionAreasStep || [];
-                                        noDigMovements.exclusionAreasStep.push(fenceWallExclusion);
-                                    } catch (e) {}
-                                    try {
-                                        const ladderExclusion = (block) => {
-                                            try {
-                                                if (!block || !block.position) return 0;
-                                                const name = String(block.name || '').toLowerCase();
-                                                if (name.includes('ladder')) return 1000;
-                                            } catch (e) {}
-                                            return 0;
-                                        };
-                                        noDigMovements.exclusionAreasStep = noDigMovements.exclusionAreasStep || [];
-                                        noDigMovements.exclusionAreasStep.push(ladderExclusion);
-                                    } catch (e) {}
+                                try {
+                                    const fenceWallExclusion = (block) => {
+                                        try {
+                                            if (!block || !block.position) return 0;
+                                            const name = String(block.name || '').toLowerCase();
+                                            if (name.includes('fence') || name.includes('wall')) return 100;
+                                            const below = bot.blockAt(block.position.offset(0, -1, 0), false);
+                                            const belowName = below && below.name ? String(below.name).toLowerCase() : '';
+                                            if (belowName.includes('fence') || belowName.includes('wall')) return 100;
+                                            const below2 = bot.blockAt(block.position.offset(0, -2, 0), false);
+                                            const below2Name = below2 && below2.name ? String(below2.name).toLowerCase() : '';
+                                            if (below2Name.includes('fence') || below2Name.includes('wall')) return 100;
+                                        } catch (e) {}
+                                        return 0;
+                                    };
+                                    noDigMovements.exclusionAreasStep = noDigMovements.exclusionAreasStep || [];
+                                    noDigMovements.exclusionAreasStep.push(fenceWallExclusion);
+                                } catch (e) {}
+                                try {
+                                    const ladderExclusion = (block) => {
+                                        try {
+                                            if (!block || !block.position) return 0;
+                                            const name = String(block.name || '').toLowerCase();
+                                            if (name.includes('ladder')) return 1000;
+                                        } catch (e) {}
+                                        return 0;
+                                    };
+                                    noDigMovements.exclusionAreasStep = noDigMovements.exclusionAreasStep || [];
+                                    noDigMovements.exclusionAreasStep.push(ladderExclusion);
+                                } catch (e) {}
                                 bot.pathfinder.setMovements(noDigMovements);
                                 appliedNoDig = true;
                             }
@@ -414,83 +402,26 @@ function inject(bot, options = {}) {
                 }
             }
 
-            if (allowBreakLastResort) {
-                const restoreBreak = applyTemporaryBreakPathing({ allowPlacing: !forbidPathScaffolding });
+            if (baritone && typeof baritone.goto === 'function') {
+                const restoreBreak = allowBreakLastResort ? applyTemporaryBreakPathing({ allowPlacing: !forbidPathScaffolding }) : null;
                 try {
-                    const result = antiFreezeEnabled
-                        ? await baritoneGotoWithAntiFreeze(targetPos, range, antiFreezeTimeoutMs)
-                        : await baritone.goto(new goals.GoalNear(targetPos, range));
-
-                    if (result && result.status === 'failed') {
-                        throw result.error || new Error('Baritone failed to reach the target with breaking');
+                    if (baritone.stopped === false) {
+                        if (typeof baritone.stop === 'function') {
+                            baritone.stop();
+                            await wait(100);
+                        }
                     }
 
+                    const result = await baritone.goto(new goals.GoalNear(targetPos, range));
+                    if (result && result.status === 'failed') {
+                        throw result.error || new Error('Baritone failed to reach the target');
+                    }
                     return;
                 } catch (error) {
                     lastError = error;
                 } finally {
-                    restoreBreak();
-                }
-
-                if (bot.pathfinder && typeof bot.pathfinder.goto === 'function') {
-                    const pfGoals = getPathfinderGoals();
-
-                    if (pfGoals && typeof pfGoals.GoalNear === 'function') {
-                        let previousMovements = null;
-                        let appliedMovements = false;
-
-                        try {
-                            const pfModule = require('mineflayer-pathfinder');
-                            if (pfModule && pfModule.Movements && typeof bot.pathfinder.setMovements === 'function') {
-                                previousMovements = bot.pathfinder.movements || null;
-                                const breakMovements = new pfModule.Movements(bot);
-                                breakMovements.canDig = true;
-                                breakMovements.allow1by1towers = !forbidPathScaffolding;
-                                if (forbidPathScaffolding && Array.isArray(breakMovements.scafoldingBlocks)) {
-                                    breakMovements.scafoldingBlocks = [];
-                                }
-                                // Avoid stepping on fences/walls and the block above them
-                                    try {
-                                        const fenceWallExclusion2 = (block) => {
-                                            try {
-                                                if (!block || !block.position) return 0;
-                                                const name = String(block.name || '').toLowerCase();
-                                                if (name.includes('fence') || name.includes('wall')) return 100;
-                                                const below = bot.blockAt(block.position.offset(0, -1, 0), false);
-                                                const belowName = below && below.name ? String(below.name).toLowerCase() : '';
-                                                if (belowName.includes('fence') || belowName.includes('wall')) return 100;
-                                                const below2 = bot.blockAt(block.position.offset(0, -2, 0), false);
-                                                const below2Name = below2 && below2.name ? String(below2.name).toLowerCase() : '';
-                                                if (below2Name.includes('fence') || below2Name.includes('wall')) return 100;
-                                            } catch (e) {}
-                                            return 0;
-                                        };
-                                        breakMovements.exclusionAreasStep = breakMovements.exclusionAreasStep || [];
-                                        breakMovements.exclusionAreasStep.push(fenceWallExclusion2);
-                                    } catch (e) {}
-                                try {
-                                    const ladderExclusion2 = (block) => {
-                                        try {
-                                            if (!block || !block.position) return 0;
-                                            const name = String(block.name || '').toLowerCase();
-                                            if (name.includes('ladder')) return 1000;
-                                        } catch (e) {}
-                                        return 0;
-                                    };
-                                    breakMovements.exclusionAreasStep = breakMovements.exclusionAreasStep || [];
-                                    breakMovements.exclusionAreasStep.push(ladderExclusion2);
-                                } catch (e) {}
-                                bot.pathfinder.setMovements(breakMovements);
-                                appliedMovements = true;
-                            }
-
-                            await bot.pathfinder.goto(new pfGoals.GoalNear(targetPos.x, targetPos.y, targetPos.z, range));
-                            return;
-                        } finally {
-                            if (appliedMovements && previousMovements && typeof bot.pathfinder.setMovements === 'function') {
-                                bot.pathfinder.setMovements(previousMovements);
-                            }
-                        }
+                    if (restoreBreak) {
+                        restoreBreak();
                     }
                 }
             }
@@ -499,7 +430,7 @@ function inject(bot, options = {}) {
                 throw lastError;
             }
 
-            throw new Error('Baritone stayed busy after multiple retries and no pathfinder fallback was available');
+            throw new Error('No movement backend was available for the build');
         } finally {
             restoreNoBreak();
         }
