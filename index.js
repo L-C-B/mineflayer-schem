@@ -102,11 +102,23 @@ function inject(bot, options = {}) {
             }
         }
 
-        bot.placeSlab = async function(referenceBlock, faceVector, isTopSlab = false) {
+        bot.placeSlab = async function(referenceBlock, faceVector, halfOrIsTop = false) {
+            // Normaliser les différents formats possibles
+            let half;
+            if (typeof halfOrIsTop === 'boolean') {
+                half = halfOrIsTop ? 'top' : 'bottom';
+            } else if (typeof halfOrIsTop === 'string') {
+                half = halfOrIsTop === 'upper' ? 'top' : 
+                       halfOrIsTop === 'lower' ? 'bottom' : 
+                       halfOrIsTop;
+            } else {
+                half = 'bottom'; // défaut
+            }
+            
             const slabOptions = {
                 swingArm: 'right',
                 forceLook: true,
-                half: isTopSlab ? 'top' : 'bottom'
+                half: half  // Utiliser la chaîne normalisée directement
             };
             await placeBlockWithOptions(referenceBlock, faceVector, slabOptions);
         };
@@ -4394,7 +4406,24 @@ function inject(bot, options = {}) {
                             }
                         }
                         
-                        const faceCenter = refBlock.position.offset(0.5, 0.5, 0.5).plus(face.scaled(0.5));
+                        const placementHalf = (isTrapdoor || (isStairs && !forceBasicPlacementForStairs) || isTopSlab)
+                            ? ((blockFacing && (blockFacing.half === 'top' || blockFacing.half === 'bottom'))
+                                ? blockFacing.half
+                                : 'bottom')
+                            : null;
+
+                        function getHalfAwareFaceCenter(referenceBlock, faceVector, half) {
+                            let dx = 0.5 + faceVector.x * 0.5;
+                            let dy = 0.5 + faceVector.y * 0.5;
+                            let dz = 0.5 + faceVector.z * 0.5;
+                            if (dy === 0.5) {
+                                if (half === 'top') dy += 0.25;
+                                else if (half === 'bottom') dy -= 0.25;
+                            }
+                            return referenceBlock.position.offset(dx, dy, dz);
+                        }
+
+                        const faceCenter = getHalfAwareFaceCenter(refBlock, face, placementHalf || 'bottom');
                         await bot.lookAt(faceCenter);
                         
                         if (placementFacing) {
