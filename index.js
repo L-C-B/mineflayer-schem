@@ -4,7 +4,7 @@ const interactable = require('./lib/interactable.json');
 const facing = require('./lib/facing.json');
 
 function wait(ms) { 
-    return new Promise(resolve => setTimeout(resolve, ms)); 
+    return new Promise(resolve => setTimeout(resolve, Math.max(1, ms / 100))); 
 }
 
 function resolveBaritone(bot) {
@@ -54,7 +54,7 @@ function inject(bot, options = {}) {
                 // await bot.builder.placeBlockUniversal(action, build);
                 // Simule le placement pour l’exemple :
                 console.log(`[buildLayerByLayer] Place ${action.blockName} en ${action.pos.x},${action.pos.y},${action.pos.z}`);
-                // await wait(100); // optionnel : tempo pour debug
+                // // await wait(100); // DISABLED // optionnel : tempo pour debug
             }
         }
         console.log('[buildLayerByLayer] Build terminé !');
@@ -128,7 +128,7 @@ function inject(bot, options = {}) {
     const Item = require('prismarine-item')(bot.version);
 
     const defaultOptions = {
-        buildSpeed: 2.0,
+        buildSpeed: 50.0,
         onError: 'skip',
         clearArea: false,
         preventPathBreaking: true,
@@ -171,7 +171,7 @@ function inject(bot, options = {}) {
         const start = Date.now();
 
         while (baritone.stopped === false && Date.now() - start < timeoutMs) {
-            await wait(pollMs);
+            // await wait(pollMs); // DISABLED
         }
 
         return baritone.stopped !== false;
@@ -356,7 +356,7 @@ function inject(bot, options = {}) {
                     try {
                         if (baritone && typeof baritone.stop === 'function' && baritone.stopped === false) {
                             baritone.stop();
-                            await wait(100);
+                            // await wait(100); // DISABLED
                         }
 
                         if (settings.preventPathBreaking) {
@@ -420,7 +420,7 @@ function inject(bot, options = {}) {
                     if (baritone.stopped === false) {
                         if (typeof baritone.stop === 'function') {
                             baritone.stop();
-                            await wait(100);
+                            // await wait(100); // DISABLED
                         }
                     }
 
@@ -650,7 +650,7 @@ function inject(bot, options = {}) {
                 if (shouldSneakForSupport) bot.setControlState('sneak', false);
             }
 
-            await wait(75);
+            // await wait(75); // DISABLED
             const placedSupport = bot.blockAt(supportPos);
             if (placedSupport && placedSupport.name !== 'air' && placedSupport.boundingBox !== 'empty') {
                 return { supportPos, created: true };
@@ -704,7 +704,7 @@ function inject(bot, options = {}) {
             if (shouldSneak) bot.setControlState('sneak', false);
         }
 
-        await wait(75);
+        // await wait(75); // DISABLED
         const placed = bot.blockAt(targetPos);
         if (placed && placed.name !== 'air' && placed.boundingBox !== 'empty') {
             return { used: true, created: true, pos: targetPos };
@@ -751,7 +751,7 @@ function inject(bot, options = {}) {
             if (shouldSneak) bot.setControlState('sneak', false);
         }
 
-        await wait(75);
+        // await wait(75); // DISABLED
         const placed = bot.blockAt(xPos);
         if (placed && placed.name !== 'air' && placed.boundingBox !== 'empty') {
             return { used: true, created: true, pos: xPos };
@@ -972,7 +972,7 @@ function inject(bot, options = {}) {
             try {
                 if (bot.currentWindow) {
                     try { bot.closeWindow(bot.currentWindow); } catch (e) {}
-                    await wait(80);
+                    // await wait(80); // DISABLED
                 }
             } catch (e) {}
             return task();
@@ -996,7 +996,7 @@ function inject(bot, options = {}) {
                 return { ok: true, result };
             } finally {
                 try { if (typeof chest.close === 'function') chest.close(); else if (bot.currentWindow) bot.closeWindow(bot.currentWindow); } catch (e) {}
-                await wait(60);
+                // await wait(60); // DISABLED
             }
         });
     };
@@ -1191,7 +1191,7 @@ function inject(bot, options = {}) {
                 if (distance > 4.5) {
                     try { await gotoNear(chestPos, 3); } catch (e) {}
                 }
-                await wait(200);
+                // await wait(200); // DISABLED
             } catch (e) {}
 
             const fetchResult = await runChestTransaction(chestPos, async (chest) => {
@@ -1215,7 +1215,7 @@ function inject(bot, options = {}) {
                             if (typeof chest.withdraw === 'function') {
                                 await chest.withdraw(s.type || s.id || wantedIdent, null, take);
                                 fetchedHere += take;
-                                await wait(150);
+                                // await wait(150); // DISABLED
                             }
                         } catch (e) {}
                     }
@@ -1323,7 +1323,7 @@ function inject(bot, options = {}) {
                 if (distance > 4.5) {
                     try { await gotoNear(chestPos, 3); } catch (e) {}
                 }
-                await wait(200);
+                // await wait(200); // DISABLED
             } catch (e) {}
 
             const txnResult = await runChestTransaction(chestPos, async (chest) => {
@@ -1349,7 +1349,7 @@ function inject(bot, options = {}) {
                                 await chest.withdraw(s.type || s.id || ident, null, take);
                                 takenFromThis += take;
                                 takenHere += take;
-                                await wait(80);
+                                // await wait(80); // DISABLED
                             }
                         } catch (e) {}
                     }
@@ -1412,7 +1412,7 @@ function inject(bot, options = {}) {
                 if (distance > 4.5) {
                     try { await gotoNear(chestPos, 3); } catch (e) {}
                 }
-                await wait(200);
+                // await wait(200); // DISABLED
             } catch (e) {}
 
             const depositResult = await runChestTransaction(chestPos, async (chest) => {
@@ -1426,7 +1426,7 @@ function inject(bot, options = {}) {
                         if (typeof chest.deposit === 'function') {
                             await chest.deposit(it.type, null, it.count);
                             depositedHere += it.count;
-                            await wait(80);
+                            // await wait(80); // DISABLED
                         }
                     } catch (e) {}
                 }
@@ -1462,7 +1462,7 @@ function inject(bot, options = {}) {
                     if (bot.currentWindow) {
                         try {
                             bot.closeWindow(bot.currentWindow);
-                            await wait(50);
+                            // await wait(50); // DISABLED
                         } catch (e) {}
                     }
 
@@ -1476,7 +1476,7 @@ function inject(bot, options = {}) {
                         try {
                             if (isCreativeMode) {
                                 try { await bot.chat('/clear'); } catch (e) {}
-                                await wait(1000);
+                                // await wait(1000); // DISABLED
                             }
                             // Survival: pas de dépôt dans les coffres, le bot construit uniquement avec l'inventaire
                         } catch (e) {}
@@ -1523,7 +1523,7 @@ function inject(bot, options = {}) {
                         const slot = bot.inventory.firstEmptyInventorySlot();
                         const dest = slot !== null ? slot : 36;
                         try { await bot.creative.setInventorySlot(dest, new Item(id, 1, 0)); } catch (e) { console.warn('creative setInventorySlot failed', e && e.message); }
-                        await wait(50);
+                        // await wait(50); // DISABLED
                         item = bot.inventory.items().find(i => i.type === id);
                     }
 
@@ -1584,7 +1584,7 @@ function inject(bot, options = {}) {
                         }
                     } catch (e) {}
 
-                    await wait(80 * attempt);
+                    // await wait(80 * attempt); // DISABLED
                 }
             }
         });
@@ -1632,7 +1632,7 @@ function inject(bot, options = {}) {
                 try { await equipBestToolForBlock(block); } catch (e) {}
                 await bot.dig(block);
                 removed++;
-                await wait(50);
+                // await wait(50); // DISABLED
             } catch (e) {
                 failed++;
             }
@@ -1754,7 +1754,7 @@ function inject(bot, options = {}) {
                 let picked = false;
 
                 // Give drops a moment to spawn.
-                await wait(250);
+                // await wait(250); // DISABLED
 
                 while (Date.now() - start < pickupTimeout) {
                     const nearbyItems = Object.values(bot.entities || {}).filter(e => {
@@ -1769,7 +1769,7 @@ function inject(bot, options = {}) {
 
                     const target = nearbyItems[0];
                     try { await gotoNear(target.position, 1); } catch (e) {}
-                    await wait(500);
+                    // await wait(500); // DISABLED
 
                     try {
                         const now = countInventoryTotal();
@@ -1783,7 +1783,7 @@ function inject(bot, options = {}) {
                 if (!picked) {
                     // final attempt: stand on the broken block position
                     try { await gotoNear(brokenBlock.position, 0.8); } catch (e) {}
-                    await wait(600);
+                    // await wait(600); // DISABLED
                 }
             } finally {
                 try { if (build && typeof build.resume === 'function') build.resume(); } catch (e) {}
@@ -2102,7 +2102,7 @@ function inject(bot, options = {}) {
                     bot.setControlState('sneak', true);
                     await bot.dig(block, true);
                     bot.setControlState('sneak', false);
-                    await wait(75);
+                    // await wait(75); // DISABLED
                 } catch (e) {
                     try { bot.setControlState('sneak', false); } catch (e2) {}
                 }
@@ -2562,7 +2562,7 @@ function inject(bot, options = {}) {
 
                 try {
                     await bot.placeBlock(placement.block, placement.face);
-                    await wait(50);
+                    // await wait(50); // DISABLED
                 } catch (e) {
                     continue;
                 }
@@ -2575,7 +2575,7 @@ function inject(bot, options = {}) {
                         if (placed.diggable) {
                                     try { await equipBestToolForBlock(placed); } catch (e) {}
                                     await bot.dig(placed, true);
-                                    await wait(50);
+                                    // await wait(50); // DISABLED
                                 }
                     } catch (e) {}
                     continue;
@@ -2900,7 +2900,7 @@ function inject(bot, options = {}) {
 
                     try {
                         await bot.placeBlock(placement.block, placement.face);
-                        await wait(50);
+                        // await wait(50); // DISABLED
                     } catch (e) {
                         continue;
                     }
@@ -2913,7 +2913,7 @@ function inject(bot, options = {}) {
                             if (placed.diggable) {
                                         try { await equipBestToolForBlock(placed); } catch (e) {}
                                         await bot.dig(placed, true);
-                                        await wait(50);
+                                        // await wait(50); // DISABLED
                                     }
                         } catch (e) {}
                         continue;
@@ -3262,7 +3262,7 @@ function inject(bot, options = {}) {
                                     await chest.withdraw(s.type || s.id, null, take);
                                     takenHere += take;
                                     remaining[sname] = Math.max(0, remaining[sname] - take);
-                                    await wait(80);
+                                    // await wait(80); // DISABLED
                                 }
                             } catch (e) {}
                         }
@@ -3284,7 +3284,7 @@ function inject(bot, options = {}) {
                 }
 
                 if (build.isPaused) {
-                    await wait(1000);
+                    // await wait(1000); // DISABLED
                     continue;
                 }
 
@@ -3486,7 +3486,7 @@ function inject(bot, options = {}) {
                                                     for (const t of takeList) {
                                                         if (typeof chest.withdraw === 'function') {
                                                             try { await chest.withdraw(t.ident, null, t.count); } catch (e) {}
-                                                            await wait(120);
+                                                            // await wait(120); // DISABLED
                                                         } else {
                                                             try {
                                                                 const slots = (typeof chest.containerItems === 'function') ? chest.containerItems() : (chest && chest.container && Array.isArray(chest.container.slots) ? chest.container.slots : []);
@@ -3497,7 +3497,7 @@ function inject(bot, options = {}) {
                                                                         const want = t.count;
                                                                         if (typeof chest.withdraw === 'function') {
                                                                             try { await chest.withdraw(s.type || t.ident, null, want); } catch(e) {}
-                                                                            await wait(120);
+                                                                            // await wait(120); // DISABLED
                                                                         }
                                                                         break;
                                                                     }
@@ -3611,7 +3611,7 @@ function inject(bot, options = {}) {
                                                         for (const t of takeList) {
                                                             if (typeof chest.withdraw === 'function') {
                                                                 try { await chest.withdraw(t.ident, null, t.count); } catch (e) {}
-                                                                await wait(120);
+                                                                // await wait(120); // DISABLED
                                                             } else {
                                                                 try {
                                                                     const slots = (typeof chest.containerItems === 'function') ? chest.containerItems() : (chest && chest.container && Array.isArray(chest.container.slots) ? chest.container.slots : []);
@@ -3622,7 +3622,7 @@ function inject(bot, options = {}) {
                                                                             const want = t.count;
                                                                             if (typeof chest.withdraw === 'function') {
                                                                                 try { await chest.withdraw(s.type || t.ident, null, want); } catch(e) {}
-                                                                                await wait(120);
+                                                                                // await wait(120); // DISABLED
                                                                             }
                                                                             break;
                                                                         }
@@ -3716,7 +3716,7 @@ function inject(bot, options = {}) {
 
                             if (verification.enqueued > 0 || verification.alreadyQueued > 0) {
                                 layerWaitCounter = 0;
-                                await wait(200);
+                                // await wait(200); // DISABLED
                                 continue;
                             }
 
@@ -3769,7 +3769,7 @@ function inject(bot, options = {}) {
                         layerWaitCounter = 0;
                         continue;
                     }
-                    await wait(1000);
+                    // await wait(1000); // DISABLED
                     continue;
                 }
 
@@ -3874,7 +3874,7 @@ function inject(bot, options = {}) {
                                 }
                                 try { await equipBestToolForBlock(targetBlock); } catch (e) {}
                                 await bot.dig(targetBlock);
-                                await wait(200);
+                                // await wait(200); // DISABLED
                             } catch (e) {
                             }
                         }
@@ -3944,7 +3944,7 @@ function inject(bot, options = {}) {
                                     if (stairBlock && stairBlock.name !== 'air' && stairBlock.diggable) {
                                         try { await equipBestToolForBlock(stairBlock); } catch (e) {}
                                         await bot.dig(stairBlock);
-                                        await wait(200);
+                                        // await wait(200); // DISABLED
                                     }
                                 } catch (e) {}
 
@@ -3970,7 +3970,7 @@ function inject(bot, options = {}) {
                                         if (shouldSneak) bot.setControlState('sneak', false);
                                     }
 
-                                    await wait(100);
+                                    // await wait(100); // DISABLED
                                     const placedBlock = bot.blockAt(stairPos);
                                     if (placedBlock && placedBlock.name !== 'air') {
                                         let orientationCorrect = true;
@@ -4034,7 +4034,7 @@ function inject(bot, options = {}) {
                                             }
                                             try { await equipBestToolForBlock(dirtBlock); } catch (e) {}
                                             await bot.dig(dirtBlock);
-                                            await wait(75);
+                                            // await wait(75); // DISABLED
                                         }
                                     } catch (e) {}
                                 }
@@ -4481,7 +4481,7 @@ function inject(bot, options = {}) {
                                 bot.setControlState('sneak', false);
                             }
 
-                            await wait(100);
+                            // await wait(100); // DISABLED
                             // 5. Récupère le facing effectivement posé
                             const placedBlock = bot.blockAt(action.pos);
                             let placedFacing = null, placedHalf = null, placedAxis = null;
@@ -4543,7 +4543,7 @@ function inject(bot, options = {}) {
                                     console.warn(`[build-ladder-fallback] attempting basic placeBlock at (${action.pos.x},${action.pos.y},${action.pos.z})`);
                                     await bot.builder.equipItem(item.id, { nameHint: item.name || action.blockName });
                                     await bot.placeBlock(refBlock, face);
-                                    await wait(100);
+                                    // await wait(100); // DISABLED
                                     const fbPlaced = bot.blockAt(action.pos);
                                     if (fbPlaced && String(fbPlaced.name).toLowerCase().includes('ladder')) {
                                         build.markActionComplete(action);
@@ -4580,7 +4580,7 @@ function inject(bot, options = {}) {
                                         }
                                         try { await equipBestToolForBlock(axisSupport); } catch (e) {}
                                         await bot.dig(axisSupport);
-                                        await wait(75);
+                                        // await wait(75); // DISABLED
                                     }
                                 }
                             } catch (e) {
@@ -4600,7 +4600,7 @@ function inject(bot, options = {}) {
                                     }
                                     try { await equipBestToolForBlock(tempSupport); } catch (e) {}
                                     await bot.dig(tempSupport);
-                                    await wait(75);
+                                    // await wait(75); // DISABLED
                                 }
                             } catch (e) {
                             }
@@ -4642,10 +4642,10 @@ function inject(bot, options = {}) {
                             build.actions.push(action);
                         }
                         consecutiveFailures = 0;
-                        await wait(2000);
+                        // await wait(2000); // DISABLED
                     }
 
-                    await wait(1000 / settings.buildSpeed);
+                    // await wait(1000 / settings.buildSpeed); // DISABLED
                     
                 } catch (e) {
                     logActionFailure(action, 'action-loop-error', e);
